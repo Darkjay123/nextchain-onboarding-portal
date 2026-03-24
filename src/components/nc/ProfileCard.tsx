@@ -1,6 +1,7 @@
+import { useAccount } from "wagmi";
 import { NCCard } from "./NCCard";
 import { Bar } from "./Bar";
-import { DEMO_ADDR, shortAddr, MAX_POINTS } from "@/lib/data";
+import { shortAddr, MAX_POINTS } from "@/lib/data";
 
 interface ProfileCardProps {
   walletConnected: boolean;
@@ -8,8 +9,9 @@ interface ProfileCardProps {
 }
 
 export function ProfileCard({ walletConnected, pts }: ProfileCardProps) {
+  const { address } = useAccount();
   const fields = [
-    { label: "Wallet", val: walletConnected ? shortAddr(DEMO_ADDR) : "Not connected", mono: true, green: walletConnected },
+    { label: "Wallet", val: walletConnected && address ? shortAddr(address) : "Not connected", mono: true, green: walletConnected },
     { label: "Network", val: "Base — Chain 8453", mono: false, green: false },
     { label: "Status", val: walletConnected ? "Active" : "Pending", mono: false, green: false },
   ];

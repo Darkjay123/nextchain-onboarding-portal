@@ -1,15 +1,19 @@
 import { useAccount } from "wagmi";
 import { NCCard } from "./NCCard";
 import { Bar } from "./Bar";
-import { shortAddr, MAX_POINTS } from "@/lib/data";
+import { shortAddr, MAX_POINTS, QUESTS } from "@/lib/data";
+import { type QuestStates, getQuestState } from "@/lib/questState";
 
 interface ProfileCardProps {
   walletConnected: boolean;
-  pts: number;
+  questStates: QuestStates;
 }
 
-export function ProfileCard({ walletConnected, pts }: ProfileCardProps) {
+export function ProfileCard({ walletConnected, questStates }: ProfileCardProps) {
   const { address } = useAccount();
+  const pts = QUESTS.filter((q) => getQuestState(questStates, q.id).status === "verified")
+    .reduce((s, q) => s + q.points, 0);
+
   const fields = [
     { label: "Wallet", val: walletConnected && address ? shortAddr(address) : "Not connected", mono: true, green: walletConnected },
     { label: "Network", val: "Base — Chain 8453", mono: false, green: false },
@@ -19,7 +23,7 @@ export function ProfileCard({ walletConnected, pts }: ProfileCardProps) {
   return (
     <NCCard>
       <div className="mb-1 text-base font-extrabold text-foreground">Student Profile</div>
-      <div className="mb-5 text-xs text-muted-foreground">Demo wallet · onboarding state</div>
+      <div className="mb-5 text-xs text-muted-foreground">Your wallet · onboarding state</div>
       {fields.map(({ label, val, mono, green }) => (
         <div key={label} className="mb-2 rounded-xl border border-border bg-background px-3.5 py-3">
           <div className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>

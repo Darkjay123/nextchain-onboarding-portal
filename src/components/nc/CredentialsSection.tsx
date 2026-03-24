@@ -3,19 +3,51 @@ import { NCCard } from "./NCCard";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
 import { Bar } from "./Bar";
-import { CREDENTIALS } from "@/lib/data";
+import { CREDENTIALS, QUESTS, type Credential } from "@/lib/data";
+import { type QuestStates, getQuestState } from "@/lib/questState";
 import { mintCredential } from "@/lib/mintCredential";
 
 interface CredentialsSectionProps {
-  pts: number;
+  questStates: QuestStates;
+  totalPts: number;
   walletConnected: boolean;
   walletAddress: string | null;
-  adminVerified: boolean;
+  adminVerified: Record<string, boolean>;
   minted: Record<string, boolean>;
   onMint: (id: string) => void;
 }
 
-export function CredentialsSection({ pts, walletConnected, walletAddress, adminVerified, minted, onMint }: CredentialsSectionProps) {
+function getCredentialProgress(
+  cred: Credential,
+  questStates: QuestStates
+): { completed: number; total: number; allMet: boolean; questDetails: { id: string; title: string; done: boolean }[] } {
+  const questDetails = cred.requiredQuests.map((qId) => {
+    const quest = QUESTS.find((q) => q.id === qId);
+    const state = getQuestState(questStates, qId);
+    return {
+      id: qId,
+      title: quest?.title || qId,
+      done: state.status === "verified",
+    };
+  });
+  const completed = questDetails.filter((q) => q.done).length;
+  return {
+    completed,
+    total: questDetails.length,
+    allMet: completed === questDetails.length,
+    questDetails,
+  };
+}
+
+export function CredentialsSection({
+  questStates,
+  totalPts,
+  walletConnected,
+  walletAddress,
+  adminVerified,
+  minted,
+  onMint,
+}: CredentialsSectionProps) {
   const [mintingId, setMintingId] = useState<string | null>(null);
   const [mintResults, setMintResults] = useState<Record<string, { txHash?: string; error?: string }>>({});
 
@@ -47,8 +79,11 @@ export function CredentialsSection({ pts, walletConnected, walletAddress, adminV
       </div>
       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
         {CREDENTIALS.map((cred) => {
-          const unlocked = pts >= cred.req;
-          const canClaim = unlocked && walletConnected && adminVerified && !minted[cred.id];
+          const progress = getCredentialProgress(cred, questStates);
+          const meetsPoints = cred.minPoints ? totalPts >= cred.minPoints : true;
+          const meetsAdmin = cred.requiresAdminApproval ? adminVerified[cred.id] : true;
+          const unlocked = progress.allMet && meetsPoints && meetsAdmin;
+          const canClaim = unlocked && walletConnected && !minted[cred.id];
           const claimed = minted[cred.id];
           const isMinting = mintingId === cred.id;
           const result = mintResults[cred.id];
@@ -101,6 +136,49 @@ export function CredentialsSection({ pts, walletConnected, walletAddress, adminV
                 </div>
                 <div className="text-[11.5px] leading-relaxed text-muted-foreground">{cred.desc}</div>
               </div>
+
+              {/* Requirements list */}
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Requirements</div>
+                {progress.questDetails.map((qd) => (
+                  <div key={qd.id} className="flex items-center gap-2 text-[11.5px]">
+                    <span style={{ color: qd.done ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}>
+                      {qd.done ? "✓" : "○"}
+                    </span>
+                    <span
+                      style={{ color: qd.done ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}
+                    >
+                      {qd.title}
+                    </span>
+                  </div>
+                ))}
+                {cred.minPoints && (
+                  <div className="flex items-center gap-2 text-[11.5px]">
+                    <span style={{ color: meetsPoints ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}>
+                      {meetsPoints ? "✓" : "○"}
+                    </span>
+                    <span
+                      style={{ color: meetsPoints ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}
+                    >
+                      Earn {cred.minPoints}+ points
+                    </span>
+                  </div>
+                )}
+                {cred.requiresAdminApproval && (
+                  <div className="flex items-center gap-2 text-[11.5px]">
+                    <span style={{ color: meetsAdmin ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}>
+                      {meetsAdmin ? "✓" : "○"}
+                    </span>
+                    <span
+                      style={{ color: meetsAdmin ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}
+                    >
+                      Admin approval
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress bar */}
               <div>
                 <div className="mb-1.5 flex justify-between">
                   <span className="text-[11px] text-muted-foreground">Progress</span>
@@ -108,10 +186,10 @@ export function CredentialsSection({ pts, walletConnected, walletAddress, adminV
                     className="tabular text-[11px] font-bold"
                     style={{ color: unlocked ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}
                   >
-                    {Math.min(pts, cred.req)}/{cred.req} pts
+                    {progress.completed}/{progress.total} tasks
                   </span>
                 </div>
-                <Bar pct={(pts / cred.req) * 100} />
+                <Bar pct={(progress.completed / progress.total) * 100} />
               </div>
 
               {/* Mint button / status */}
@@ -119,19 +197,24 @@ export function CredentialsSection({ pts, walletConnected, walletAddress, adminV
                 <Btn disabled variant="outline" className="w-full justify-center text-xs">
                   Minting…
                 </Btn>
-              ) : canClaim || claimed ? (
+              ) : canClaim ? (
                 <Btn
-                  onClick={() => canClaim && handleMint(cred.id)}
-                  disabled={claimed}
-                  variant={claimed ? "success" : "primary"}
+                  onClick={() => handleMint(cred.id)}
+                  variant="primary"
                   className="w-full justify-center text-xs"
                 >
-                  {claimed ? "Claimed on Base ✓" : "⬡ Claim on Base"}
+                  ⬡ Claim on Base
                 </Btn>
-              ) : unlocked && walletConnected && !adminVerified ? (
-                <div className="text-center text-[11px] text-muted-foreground">⏳ Awaiting admin verification</div>
+              ) : claimed ? (
+                <Btn disabled variant="success" className="w-full justify-center text-xs">
+                  Claimed on Base ✓
+                </Btn>
               ) : !walletConnected ? (
                 <div className="text-center text-[11px] text-muted-foreground/40">Connect wallet to claim</div>
+              ) : !unlocked ? (
+                <div className="text-center text-[11px] text-muted-foreground">
+                  Complete all requirements to unlock
+                </div>
               ) : null}
 
               {/* Result feedback */}

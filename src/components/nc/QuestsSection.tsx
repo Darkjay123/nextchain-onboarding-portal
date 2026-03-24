@@ -191,7 +191,7 @@ function QuestAction({ quest, state, walletConnected, onAction, linkValue, onLin
         >
           Open Link ↗
         </Btn>
-        {state.linkOpened && state.status !== "submitted" && (
+        {state.linkOpened && (
           <Btn
             onClick={() => onAction(quest.id, "submit_self")}
             className="flex-shrink-0 rounded-lg px-3.5 py-1.5 text-xs"

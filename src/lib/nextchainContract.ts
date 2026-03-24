@@ -1,0 +1,77 @@
+export const CONTRACT_ADDRESS = "0xF34Dabf3107b916B085BFafF8FEe16938A44619e";
+
+export const CONTRACT_ABI = [
+  {
+    inputs: [],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "sender", type: "address" },
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+      { internalType: "address", name: "owner", type: "address" },
+    ],
+    name: "ERC721IncorrectOwner",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "operator", type: "address" },
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+    ],
+    name: "ERC721InsufficientApproval",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "approver", type: "address" },
+    ],
+    name: "ERC721InvalidApprover",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "operator", type: "address" },
+    ],
+    name: "ERC721InvalidOperator",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "owner", type: "address" },
+    ],
+    name: "ERC721InvalidOwner",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "receiver", type: "address" },
+    ],
+    name: "ERC721InvalidReceiver",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "sender", type: "address" },
+    ],
+    name: "ERC721InvalidSender",
+    type: "error",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+    ],
+    name: "ERC721NonexistentToken",
+    type: "error",
+  },
+  {
+    inputs: [{ internalType: "address", name: "to", type: "address" }],
+    name: "mint",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export const BASE_MAINNET_CHAIN_ID = 8453;

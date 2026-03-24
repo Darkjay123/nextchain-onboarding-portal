@@ -1,18 +1,40 @@
+import { useState } from "react";
 import { NCCard } from "./NCCard";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
 import { Bar } from "./Bar";
 import { CREDENTIALS } from "@/lib/data";
+import { mintCredential } from "@/lib/mintCredential";
 
 interface CredentialsSectionProps {
   pts: number;
   walletConnected: boolean;
+  walletAddress: string | null;
   adminVerified: boolean;
   minted: Record<string, boolean>;
   onMint: (id: string) => void;
 }
 
-export function CredentialsSection({ pts, walletConnected, adminVerified, minted, onMint }: CredentialsSectionProps) {
+export function CredentialsSection({ pts, walletConnected, walletAddress, adminVerified, minted, onMint }: CredentialsSectionProps) {
+  const [mintingId, setMintingId] = useState<string | null>(null);
+  const [mintResults, setMintResults] = useState<Record<string, { txHash?: string; error?: string }>>({});
+
+  const handleMint = async (credId: string) => {
+    if (!walletAddress) return;
+    setMintingId(credId);
+    setMintResults((prev) => ({ ...prev, [credId]: {} }));
+
+    const result = await mintCredential(walletAddress);
+
+    if (result.success) {
+      setMintResults((prev) => ({ ...prev, [credId]: { txHash: result.txHash } }));
+      onMint(credId);
+    } else {
+      setMintResults((prev) => ({ ...prev, [credId]: { error: result.error } }));
+    }
+    setMintingId(null);
+  };
+
   return (
     <NCCard>
       <div className="mb-5">
@@ -28,6 +50,8 @@ export function CredentialsSection({ pts, walletConnected, adminVerified, minted
           const unlocked = pts >= cred.req;
           const canClaim = unlocked && walletConnected && adminVerified && !minted[cred.id];
           const claimed = minted[cred.id];
+          const isMinting = mintingId === cred.id;
+          const result = mintResults[cred.id];
 
           return (
             <div
@@ -89,9 +113,15 @@ export function CredentialsSection({ pts, walletConnected, adminVerified, minted
                 </div>
                 <Bar pct={(pts / cred.req) * 100} />
               </div>
-              {canClaim || claimed ? (
+
+              {/* Mint button / status */}
+              {isMinting ? (
+                <Btn disabled variant="outline" className="w-full justify-center text-xs">
+                  Minting…
+                </Btn>
+              ) : canClaim || claimed ? (
                 <Btn
-                  onClick={() => canClaim && onMint(cred.id)}
+                  onClick={() => canClaim && handleMint(cred.id)}
                   disabled={claimed}
                   variant={claimed ? "success" : "primary"}
                   className="w-full justify-center text-xs"
@@ -103,6 +133,24 @@ export function CredentialsSection({ pts, walletConnected, adminVerified, minted
               ) : !walletConnected ? (
                 <div className="text-center text-[11px] text-muted-foreground/40">Connect wallet to claim</div>
               ) : null}
+
+              {/* Result feedback */}
+              {result?.txHash && (
+                <div className="text-center text-[10.5px] text-primary break-all">
+                  ✓ TX:{" "}
+                  <a
+                    href={`https://basescan.org/tx/${result.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {result.txHash.slice(0, 10)}…{result.txHash.slice(-6)}
+                  </a>
+                </div>
+              )}
+              {result?.error && (
+                <div className="text-center text-[10.5px] text-destructive">{result.error}</div>
+              )}
             </div>
           );
         })}

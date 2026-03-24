@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LogoFull } from "@/components/nc/Logo";
 import { Chip } from "@/components/nc/Chip";
@@ -11,9 +11,12 @@ import { ProfileCard } from "@/components/nc/ProfileCard";
 import { AdminPanel } from "@/components/nc/AdminPanel";
 import { CredentialsSection } from "@/components/nc/CredentialsSection";
 import { QUESTS } from "@/lib/data";
+import { connectWallet } from "@/lib/mintCredential";
 
 export default function NextChainPortal() {
   const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<number[]>([]);
   const [adminVerified, setAdminVerified] = useState(false);
   const [minted, setMinted] = useState<Record<string, boolean>>({});
@@ -37,6 +40,17 @@ export default function NextChainPortal() {
     setAdminVerified(false);
   };
 
+  const handleConnect = useCallback(async () => {
+    setConnectError(null);
+    const result = await connectWallet();
+    if ("error" in result) {
+      setConnectError(result.error);
+    } else {
+      setWalletAddress(result.address);
+      setWalletConnected(true);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-background px-4 py-7 text-foreground md:px-5">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-3.5">
@@ -57,8 +71,10 @@ export default function NextChainPortal() {
 
         <HeroSection
           walletConnected={walletConnected}
-          onConnect={() => setWalletConnected(true)}
-          onCreate={() => setWalletConnected(true)}
+          walletAddress={walletAddress}
+          onConnect={handleConnect}
+          onCreate={handleConnect}
+          connectError={connectError}
         />
         <FlowSection step={step} />
         <StatsRow pts={pts} done={completed.length} minted={minted} />
@@ -93,6 +109,7 @@ export default function NextChainPortal() {
         <CredentialsSection
           pts={pts}
           walletConnected={walletConnected}
+          walletAddress={walletAddress}
           adminVerified={adminVerified}
           minted={minted}
           onMint={(id) => setMinted((p) => ({ ...p, [id]: true }))}

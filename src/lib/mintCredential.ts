@@ -13,32 +13,9 @@ export interface MintResult {
   error?: string;
 }
 
-export async function connectWallet(): Promise<{ address: string } | { error: string }> {
-  if (typeof window === "undefined" || !window.ethereum) {
-    return { error: "No wallet detected. Please install MetaMask or a compatible wallet." };
-  }
-
-  try {
-    const provider = new BrowserProvider(window.ethereum);
-    const network = await provider.getNetwork();
-
-    if (Number(network.chainId) !== BASE_MAINNET_CHAIN_ID) {
-      return { error: "Please switch your wallet to Base Mainnet (Chain 8453) to continue." };
-    }
-
-    const signer = await provider.getSigner();
-    return { address: await signer.getAddress() };
-  } catch (err: any) {
-    if (err?.code === 4001) {
-      return { error: "Wallet connection was rejected." };
-    }
-    return { error: err?.message || "Failed to connect wallet." };
-  }
-}
-
 export async function mintCredential(recipientAddress: string): Promise<MintResult> {
   if (typeof window === "undefined" || !window.ethereum) {
-    return { success: false, error: "No wallet detected. Please install MetaMask or a compatible wallet." };
+    return { success: false, error: "No wallet detected. Please connect via the wallet modal." };
   }
 
   try {
@@ -57,7 +34,6 @@ export async function mintCredential(recipientAddress: string): Promise<MintResu
 
     return { success: true, txHash: receipt.hash };
   } catch (err: any) {
-    // Handle onlyOwner revert
     if (
       err?.code === "CALL_EXCEPTION" ||
       err?.reason?.includes("OwnableUnauthorizedAccount") ||

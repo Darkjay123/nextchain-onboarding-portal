@@ -2,15 +2,17 @@ import { Wallet, Check } from "lucide-react";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
 import { LogoMark } from "./Logo";
-import { DEMO_ADDR, shortAddr } from "@/lib/data";
+import { shortAddr } from "@/lib/data";
 
 interface HeroSectionProps {
   walletConnected: boolean;
+  walletAddress: string | null;
   onConnect: () => void;
   onCreate: () => void;
+  connectError: string | null;
 }
 
-export function HeroSection({ walletConnected, onConnect, onCreate }: HeroSectionProps) {
+export function HeroSection({ walletConnected, walletAddress, onConnect, onCreate, connectError }: HeroSectionProps) {
   return (
     <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1fr_200px]">
       {/* Main hero */}
@@ -38,20 +40,25 @@ export function HeroSection({ walletConnected, onConnect, onCreate }: HeroSectio
             Building the next generation of Web3 leaders — wallet setup, quest tracking,
             and non-transferable participation credentials on Base.
           </p>
-          <div className="flex flex-wrap gap-2.5">
-            {!walletConnected ? (
-              <>
-                <Btn onClick={onConnect}>
-                  <Wallet size={14} strokeWidth={2.5} /> Connect Wallet
+          <div className="flex flex-col gap-2.5">
+            <div className="flex flex-wrap gap-2.5">
+              {!walletConnected ? (
+                <>
+                  <Btn onClick={onConnect}>
+                    <Wallet size={14} strokeWidth={2.5} /> Connect Wallet
+                  </Btn>
+                  <Btn variant="outline" onClick={onCreate}>
+                    ✦ Create New Wallet
+                  </Btn>
+                </>
+              ) : (
+                <Btn variant="success" className="cursor-default">
+                  <Check size={13} strokeWidth={3} /> {shortAddr(walletAddress || "")} · Connected
                 </Btn>
-                <Btn variant="outline" onClick={onCreate}>
-                  ✦ Create New Wallet
-                </Btn>
-              </>
-            ) : (
-              <Btn variant="success" className="cursor-default">
-                <Check size={13} strokeWidth={3} /> {shortAddr(DEMO_ADDR)} · Connected
-              </Btn>
+              )}
+            </div>
+            {connectError && (
+              <div className="text-xs font-medium text-destructive">{connectError}</div>
             )}
           </div>
         </div>

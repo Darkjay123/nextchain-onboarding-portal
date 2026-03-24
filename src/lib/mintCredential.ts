@@ -1,6 +1,12 @@
 import { BrowserProvider, Contract } from "ethers";
 import { CONTRACT_ADDRESS, CONTRACT_ABI, BASE_MAINNET_CHAIN_ID } from "./nextchainContract";
 
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 export interface MintResult {
   success: boolean;
   txHash?: string;

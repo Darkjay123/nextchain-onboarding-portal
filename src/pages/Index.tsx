@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAccount } from "wagmi";
 import { LogoFull } from "@/components/nc/Logo";
 import { Chip } from "@/components/nc/Chip";
 import { Btn } from "@/components/nc/Btn";
@@ -11,12 +12,9 @@ import { ProfileCard } from "@/components/nc/ProfileCard";
 import { AdminPanel } from "@/components/nc/AdminPanel";
 import { CredentialsSection } from "@/components/nc/CredentialsSection";
 import { QUESTS } from "@/lib/data";
-import { connectWallet } from "@/lib/mintCredential";
 
 export default function NextChainPortal() {
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [connectError, setConnectError] = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
   const [completed, setCompleted] = useState<number[]>([]);
   const [adminVerified, setAdminVerified] = useState(false);
   const [minted, setMinted] = useState<Record<string, boolean>>({});
@@ -31,25 +29,14 @@ export default function NextChainPortal() {
     if (Object.values(minted).some(Boolean)) return 6;
     if (adminVerified) return 5;
     if (completed.length > 0) return 4;
-    if (walletConnected) return 3;
+    if (isConnected) return 3;
     return 2;
-  }, [walletConnected, completed, adminVerified, minted]);
+  }, [isConnected, completed, adminVerified, minted]);
 
   const toggle = (id: number) => {
     setCompleted((p) => (p.includes(id) ? p.filter((q) => q !== id) : [...p, id]));
     setAdminVerified(false);
   };
-
-  const handleConnect = useCallback(async () => {
-    setConnectError(null);
-    const result = await connectWallet();
-    if ("error" in result) {
-      setConnectError(result.error);
-    } else {
-      setWalletAddress(result.address);
-      setWalletConnected(true);
-    }
-  }, []);
 
   return (
     <div className="min-h-screen bg-background px-4 py-7 text-foreground md:px-5">
@@ -69,20 +56,14 @@ export default function NextChainPortal() {
           </div>
         </div>
 
-        <HeroSection
-          walletConnected={walletConnected}
-          walletAddress={walletAddress}
-          onConnect={handleConnect}
-          onCreate={handleConnect}
-          connectError={connectError}
-        />
+        <HeroSection />
         <FlowSection step={step} />
         <StatsRow pts={pts} done={completed.length} minted={minted} />
 
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1.15fr_0.85fr]">
-          <QuestsSection completed={completed} onToggle={toggle} walletConnected={walletConnected} />
+          <QuestsSection completed={completed} onToggle={toggle} walletConnected={isConnected} />
           <div className="flex flex-col gap-3.5">
-            <ProfileCard walletConnected={walletConnected} pts={pts} />
+            <ProfileCard walletConnected={isConnected} pts={pts} />
             <AnimatePresence>
               {showAdmin && (
                 <motion.div
@@ -108,8 +89,8 @@ export default function NextChainPortal() {
 
         <CredentialsSection
           pts={pts}
-          walletConnected={walletConnected}
-          walletAddress={walletAddress}
+          walletConnected={isConnected}
+          walletAddress={address || null}
           adminVerified={adminVerified}
           minted={minted}
           onMint={(id) => setMinted((p) => ({ ...p, [id]: true }))}

@@ -1,18 +1,15 @@
-import { Wallet, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
 import { LogoMark } from "./Logo";
 import { shortAddr } from "@/lib/data";
 
-interface HeroSectionProps {
-  walletConnected: boolean;
-  walletAddress: string | null;
-  onConnect: () => void;
-  onCreate: () => void;
-  connectError: string | null;
-}
+export function HeroSection() {
+  const { openConnectModal } = useConnectModal();
+  const { address, isConnected } = useAccount();
 
-export function HeroSection({ walletConnected, walletAddress, onConnect, onCreate, connectError }: HeroSectionProps) {
   return (
     <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1fr_200px]">
       {/* Main hero */}
@@ -40,25 +37,20 @@ export function HeroSection({ walletConnected, walletAddress, onConnect, onCreat
             Building the next generation of Web3 leaders — wallet setup, quest tracking,
             and non-transferable participation credentials on Base.
           </p>
-          <div className="flex flex-col gap-2.5">
-            <div className="flex flex-wrap gap-2.5">
-              {!walletConnected ? (
-                <>
-                  <Btn onClick={onConnect}>
-                    <Wallet size={14} strokeWidth={2.5} /> Connect Wallet
-                  </Btn>
-                  <Btn variant="outline" onClick={onCreate}>
-                    ✦ Create New Wallet
-                  </Btn>
-                </>
-              ) : (
-                <Btn variant="success" className="cursor-default">
-                  <Check size={13} strokeWidth={3} /> {shortAddr(walletAddress || "")} · Connected
+          <div className="flex flex-wrap gap-2.5">
+            {!isConnected ? (
+              <>
+                <Btn onClick={() => openConnectModal?.()}>
+                  ⬡ Connect Wallet
                 </Btn>
-              )}
-            </div>
-            {connectError && (
-              <div className="text-xs font-medium text-destructive">{connectError}</div>
+                <Btn variant="outline" onClick={() => openConnectModal?.()}>
+                  ✦ Create New Wallet
+                </Btn>
+              </>
+            ) : (
+              <Btn variant="success" className="cursor-default">
+                <Check size={13} strokeWidth={3} /> {shortAddr(address || "")} · Connected
+              </Btn>
             )}
           </div>
         </div>

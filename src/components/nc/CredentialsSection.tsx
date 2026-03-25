@@ -3,32 +3,30 @@ import { NCCard } from "./NCCard";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
 import { Bar } from "./Bar";
-import { CREDENTIALS, QUESTS, type Credential } from "@/lib/data";
+import { CREDENTIALS, QUESTS, shortAddr, type Credential } from "@/lib/data";
+import { CONTRACT_ADDRESS } from "@/lib/nextchainContract";
 import { type QuestStates, getQuestState } from "@/lib/questState";
 import { mintCredential } from "@/lib/mintCredential";
+import type { CredentialRecord } from "@/hooks/useWalletState";
 
 interface CredentialsSectionProps {
   questStates: QuestStates;
   totalPts: number;
   walletConnected: boolean;
   walletAddress: string | null;
-  adminVerified: Record<string, boolean>;
-  minted: Record<string, boolean>;
-  onMint: (id: string) => void;
+  credentialRecords: Record<string, CredentialRecord>;
+  isAdmin: boolean;
+  onUpdateCredential: (credId: string, update: Partial<CredentialRecord>, targetWallet?: string) => void;
 }
 
 function getCredentialProgress(
   cred: Credential,
   questStates: QuestStates
-): { completed: number; total: number; allMet: boolean; questDetails: { id: string; title: string; done: boolean }[] } {
+) {
   const questDetails = cred.requiredQuests.map((qId) => {
     const quest = QUESTS.find((q) => q.id === qId);
     const state = getQuestState(questStates, qId);
-    return {
-      id: qId,
-      title: quest?.title || qId,
-      done: state.status === "verified",
-    };
+    return { id: qId, title: quest?.title || qId, done: state.status === "verified" };
   });
   const completed = questDetails.filter((q) => q.done).length;
   return {
@@ -44,23 +42,27 @@ export function CredentialsSection({
   totalPts,
   walletConnected,
   walletAddress,
-  adminVerified,
-  minted,
-  onMint,
+  credentialRecords,
+  isAdmin,
+  onUpdateCredential,
 }: CredentialsSectionProps) {
   const [mintingId, setMintingId] = useState<string | null>(null);
   const [mintResults, setMintResults] = useState<Record<string, { txHash?: string; error?: string }>>({});
 
-  const handleMint = async (credId: string) => {
+  const handleAdminMint = async (credId: string) => {
     if (!walletAddress) return;
     setMintingId(credId);
     setMintResults((prev) => ({ ...prev, [credId]: {} }));
 
     const result = await mintCredential(walletAddress);
 
-    if (result.success) {
+    if (result.success && result.txHash) {
       setMintResults((prev) => ({ ...prev, [credId]: { txHash: result.txHash } }));
-      onMint(credId);
+      onUpdateCredential(credId, {
+        issued: true,
+        tx_hash: result.txHash,
+        issued_at: new Date().toISOString(),
+      });
     } else {
       setMintResults((prev) => ({ ...prev, [credId]: { error: result.error } }));
     }
@@ -81,10 +83,10 @@ export function CredentialsSection({
         {CREDENTIALS.map((cred) => {
           const progress = getCredentialProgress(cred, questStates);
           const meetsPoints = cred.minPoints ? totalPts >= cred.minPoints : true;
-          const meetsAdmin = cred.requiresAdminApproval ? adminVerified[cred.id] : true;
+          const credRecord = credentialRecords[cred.id];
+          const meetsAdmin = cred.requiresAdminApproval ? credRecord?.eligible : true;
           const unlocked = progress.allMet && meetsPoints && meetsAdmin;
-          const canClaim = unlocked && walletConnected && !minted[cred.id];
-          const claimed = minted[cred.id];
+          const issued = credRecord?.issued || false;
           const isMinting = mintingId === cred.id;
           const result = mintResults[cred.id];
 
@@ -96,12 +98,12 @@ export function CredentialsSection({
                 background: unlocked
                   ? "linear-gradient(145deg, hsl(150 20% 6%), hsl(var(--background)))"
                   : "hsl(var(--background))",
-                borderColor: claimed
+                borderColor: issued
                   ? "hsl(var(--primary))"
                   : unlocked
                     ? "hsl(var(--border-bright))"
                     : "hsl(var(--border))",
-                boxShadow: claimed
+                boxShadow: issued
                   ? "0 0 24px var(--green-glow)"
                   : unlocked
                     ? "0 0 16px var(--green-glow)"
@@ -119,10 +121,10 @@ export function CredentialsSection({
                 >
                   {cred.emoji}
                 </div>
-                {claimed ? (
-                  <Chip variant="green">Minted ✓</Chip>
+                {issued ? (
+                  <Chip variant="green">Issued ✓</Chip>
                 ) : unlocked ? (
-                  <Chip variant="bright">Unlocked</Chip>
+                  <Chip variant="bright">Eligible</Chip>
                 ) : (
                   <Chip variant="dim">Locked</Chip>
                 )}
@@ -145,9 +147,7 @@ export function CredentialsSection({
                     <span style={{ color: qd.done ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}>
                       {qd.done ? "✓" : "○"}
                     </span>
-                    <span
-                      style={{ color: qd.done ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}
-                    >
+                    <span style={{ color: qd.done ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}>
                       {qd.title}
                     </span>
                   </div>
@@ -157,9 +157,7 @@ export function CredentialsSection({
                     <span style={{ color: meetsPoints ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}>
                       {meetsPoints ? "✓" : "○"}
                     </span>
-                    <span
-                      style={{ color: meetsPoints ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}
-                    >
+                    <span style={{ color: meetsPoints ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}>
                       Earn {cred.minPoints}+ points
                     </span>
                   </div>
@@ -169,9 +167,7 @@ export function CredentialsSection({
                     <span style={{ color: meetsAdmin ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)" }}>
                       {meetsAdmin ? "✓" : "○"}
                     </span>
-                    <span
-                      style={{ color: meetsAdmin ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}
-                    >
+                    <span style={{ color: meetsAdmin ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground) / 0.5)" }}>
                       Admin approval
                     </span>
                   </div>
@@ -192,33 +188,57 @@ export function CredentialsSection({
                 <Bar pct={(progress.completed / progress.total) * 100} />
               </div>
 
-              {/* Mint button / status */}
-              {isMinting ? (
+              {/* Status / Mint area */}
+              {issued ? (
+                <div className="flex flex-col gap-2">
+                  <Btn disabled variant="success" className="w-full justify-center text-xs">
+                    Credential Issued ✓
+                  </Btn>
+                  {credRecord?.tx_hash && (
+                    <div className="text-center text-[10.5px] text-primary break-all">
+                      <a
+                        href={`https://basescan.org/tx/${credRecord.tx_hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        View on BaseScan ↗
+                      </a>
+                    </div>
+                  )}
+                  {credRecord?.token_id && (
+                    <div className="text-center text-[10px] text-muted-foreground">
+                      Token #{credRecord.token_id} · {shortAddr(CONTRACT_ADDRESS)}
+                    </div>
+                  )}
+                </div>
+              ) : isMinting ? (
                 <Btn disabled variant="outline" className="w-full justify-center text-xs">
-                  Minting…
+                  <span className="animate-pulse">Minting…</span>
                 </Btn>
-              ) : canClaim ? (
+              ) : isAdmin && unlocked ? (
                 <Btn
-                  onClick={() => handleMint(cred.id)}
+                  onClick={() => handleAdminMint(cred.id)}
                   variant="primary"
                   className="w-full justify-center text-xs"
                 >
-                  ⬡ Claim on Base
+                  ⬡ Mint Credential
                 </Btn>
-              ) : claimed ? (
-                <Btn disabled variant="success" className="w-full justify-center text-xs">
-                  Claimed on Base ✓
-                </Btn>
+              ) : unlocked && walletConnected ? (
+                <div className="rounded-lg border border-border bg-secondary p-3 text-center">
+                  <div className="text-[12px] font-semibold text-primary">Eligible for Credential</div>
+                  <div className="mt-1 text-[11px] text-muted-foreground">Awaiting admin issuance</div>
+                </div>
               ) : !walletConnected ? (
-                <div className="text-center text-[11px] text-muted-foreground/40">Connect wallet to claim</div>
-              ) : !unlocked ? (
+                <div className="text-center text-[11px] text-muted-foreground/40">Connect wallet to view</div>
+              ) : (
                 <div className="text-center text-[11px] text-muted-foreground">
                   Complete all requirements to unlock
                 </div>
-              ) : null}
+              )}
 
               {/* Result feedback */}
-              {result?.txHash && (
+              {result?.txHash && !issued && (
                 <div className="text-center text-[10.5px] text-primary break-all">
                   ✓ TX:{" "}
                   <a

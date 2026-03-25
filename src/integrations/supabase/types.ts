@@ -14,7 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      credential_status: {
+        Row: {
+          credential_id: string
+          eligible: boolean | null
+          id: string
+          issued: boolean | null
+          issued_at: string | null
+          token_id: string | null
+          tx_hash: string | null
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          credential_id: string
+          eligible?: boolean | null
+          id?: string
+          issued?: boolean | null
+          issued_at?: string | null
+          token_id?: string | null
+          tx_hash?: string | null
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          credential_id?: string
+          eligible?: boolean | null
+          id?: string
+          issued?: boolean | null
+          issued_at?: string | null
+          token_id?: string | null
+          tx_hash?: string | null
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
+      learning_progress: {
+        Row: {
+          completed: boolean | null
+          id: string
+          module_id: string
+          passed: boolean | null
+          quiz_score: number | null
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          completed?: boolean | null
+          id?: string
+          module_id: string
+          passed?: boolean | null
+          quiz_score?: number | null
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          completed?: boolean | null
+          id?: string
+          module_id?: string
+          passed?: boolean | null
+          quiz_score?: number | null
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
+      quest_progress: {
+        Row: {
+          admin_verified: boolean | null
+          id: string
+          link_opened: boolean | null
+          quest_id: string
+          quest_type: string | null
+          status: string
+          submission_value: string | null
+          updated_at: string
+          verified_by: string | null
+          wallet_address: string
+        }
+        Insert: {
+          admin_verified?: boolean | null
+          id?: string
+          link_opened?: boolean | null
+          quest_id: string
+          quest_type?: string | null
+          status?: string
+          submission_value?: string | null
+          updated_at?: string
+          verified_by?: string | null
+          wallet_address: string
+        }
+        Update: {
+          admin_verified?: boolean | null
+          id?: string
+          link_opened?: boolean | null
+          quest_id?: string
+          quest_type?: string | null
+          status?: string
+          submission_value?: string | null
+          updated_at?: string
+          verified_by?: string | null
+          wallet_address?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

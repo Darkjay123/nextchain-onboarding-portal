@@ -1,3 +1,4 @@
+import React from "react";
 import { Check } from "lucide-react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
@@ -6,9 +7,17 @@ import { Btn } from "./Btn";
 import { LogoMark } from "./Logo";
 import { shortAddr } from "@/lib/data";
 
+const WALLET_LINKS = [
+  { name: "MetaMask", url: "https://metamask.io/download/" },
+  { name: "Zerion", url: "https://zerion.io/download" },
+  { name: "Coinbase Wallet", url: "https://www.coinbase.com/wallet/downloads" },
+  { name: "Trust Wallet", url: "https://trustwallet.com/download" },
+];
+
 export function HeroSection() {
   const { openConnectModal } = useConnectModal();
   const { address, isConnected } = useAccount();
+  const [showWalletHelp, setShowWalletHelp] = React.useState(false);
 
   return (
     <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1fr_200px]">
@@ -17,7 +26,6 @@ export function HeroSection() {
         className="relative overflow-hidden rounded-2xl border border-border-bright p-8 md:p-10"
         style={{ background: "radial-gradient(ellipse at 0% 0%, hsl(150 25% 8%), hsl(var(--card)))" }}
       >
-        {/* Glow orb */}
         <div
           className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full"
           style={{ background: "var(--green-glow)", filter: "blur(60px)" }}
@@ -43,8 +51,8 @@ export function HeroSection() {
                 <Btn onClick={() => openConnectModal?.()}>
                   ⬡ Connect Wallet
                 </Btn>
-                <Btn variant="outline" onClick={() => openConnectModal?.()}>
-                  ✦ Create New Wallet
+                <Btn variant="outline" onClick={() => setShowWalletHelp((p) => !p)}>
+                  ✦ Get a Wallet
                 </Btn>
               </>
             ) : (
@@ -53,6 +61,25 @@ export function HeroSection() {
               </Btn>
             )}
           </div>
+
+          {showWalletHelp && !isConnected && (
+            <div className="mt-4 rounded-xl border border-border bg-secondary p-4">
+              <div className="mb-2 text-xs font-bold text-foreground">Choose a wallet to get started:</div>
+              <div className="flex flex-wrap gap-2">
+                {WALLET_LINKS.map((w) => (
+                  <a
+                    key={w.name}
+                    href={w.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {w.name} ↗
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

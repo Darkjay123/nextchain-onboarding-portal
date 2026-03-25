@@ -1,22 +1,23 @@
 import { NCCard } from "./NCCard";
 import { QUESTS, CREDENTIALS, MAX_POINTS } from "@/lib/data";
 import { type QuestStates, getQuestState } from "@/lib/questState";
+import type { CredentialRecord } from "@/hooks/useWalletState";
 
 interface StatsRowProps {
   questStates: QuestStates;
-  minted: Record<string, boolean>;
+  credentialRecords: Record<string, CredentialRecord>;
 }
 
-export function StatsRow({ questStates, minted }: StatsRowProps) {
+export function StatsRow({ questStates, credentialRecords }: StatsRowProps) {
   const pts = QUESTS.filter((q) => getQuestState(questStates, q.id).status === "verified")
     .reduce((s, q) => s + q.points, 0);
   const done = QUESTS.filter((q) => getQuestState(questStates, q.id).status === "verified").length;
-  const mintCount = Object.values(minted).filter(Boolean).length;
+  const issuedCount = Object.values(credentialRecords).filter((c) => c.issued).length;
 
   const items = [
     { icon: "⚡", val: String(pts), sub: `of ${MAX_POINTS} pts`, label: "Points Earned" },
     { icon: "📋", val: `${done}/${QUESTS.length}`, sub: "quests done", label: "Quests" },
-    { icon: "🏅", val: `${mintCount}/${CREDENTIALS.length}`, sub: "credentials", label: "Credentials" },
+    { icon: "🏅", val: `${issuedCount}/${CREDENTIALS.length}`, sub: "credentials", label: "Credentials" },
     { icon: "🌍", val: "Base", sub: "Chain 8453", label: "Network" },
   ];
 

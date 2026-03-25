@@ -10,7 +10,7 @@ import {
 } from "@/lib/data";
 
 interface LearningModuleProps {
-  onComplete: () => void;
+  onComplete: (score: number, passed: boolean) => void;
   onClose: () => void;
 }
 
@@ -36,14 +36,12 @@ export function LearningModule({ onComplete, onClose }: LearningModuleProps) {
   const handleSubmitQuiz = () => {
     setQuizSubmitted(true);
     setPhase("result");
-    if (
-      QUIZ_QUESTIONS.reduce(
-        (s, q, i) => s + (answers[i] === q.correctIndex ? 1 : 0),
-        0
-      ) >= QUIZ_PASS_THRESHOLD
-    ) {
-      onComplete();
-    }
+    const finalScore = QUIZ_QUESTIONS.reduce(
+      (s, q, i) => s + (answers[i] === q.correctIndex ? 1 : 0),
+      0
+    );
+    const finalPassed = finalScore >= QUIZ_PASS_THRESHOLD;
+    onComplete(finalScore, finalPassed);
   };
 
   const handleRetry = () => {

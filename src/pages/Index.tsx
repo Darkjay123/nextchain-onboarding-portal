@@ -12,14 +12,26 @@ import { ProfileCard } from "@/components/nc/ProfileCard";
 import { AdminPanel } from "@/components/nc/AdminPanel";
 import { CredentialsSection } from "@/components/nc/CredentialsSection";
 import { QUESTS, isAdmin } from "@/lib/data";
-import { type QuestStates, getQuestState, updateQuestState } from "@/lib/questState";
+import { getQuestState } from "@/lib/questState";
+import { useWalletState } from "@/hooks/useWalletState";
 
 export default function NextChainPortal() {
   const { address, isConnected } = useAccount();
-  const [questStates, setQuestStates] = useState<QuestStates>({});
-  const [credentialApprovals, setCredentialApprovals] = useState<Record<string, boolean>>({});
-  const [minted, setMinted] = useState<Record<string, boolean>>({});
   const [showAdmin, setShowAdmin] = useState(false);
+
+  const {
+    questStates,
+    credentialRecords,
+    learningRecords,
+    loading,
+    handleQuestAction,
+    adminVerifyQuest,
+    adminRejectQuest,
+    updateCredentialStatus,
+    saveLearningProgress,
+    allSubmissions,
+    loadAllSubmissions,
+  } = useWalletState(address);
 
   const walletIsAdmin = isAdmin(address);
 
@@ -33,53 +45,15 @@ export default function NextChainPortal() {
   );
 
   const step = useMemo(() => {
-    if (Object.values(minted).some(Boolean)) return 6;
-    if (Object.values(credentialApprovals).some(Boolean)) return 5;
+    const hasIssued = Object.values(credentialRecords).some((c) => c.issued);
+    if (hasIssued) return 6;
+    const hasEligible = Object.values(credentialRecords).some((c) => c.eligible);
+    if (hasEligible) return 5;
     const hasVerified = QUESTS.some((q) => getQuestState(questStates, q.id).status === "verified");
     if (hasVerified) return 4;
     if (isConnected) return 3;
     return 2;
-  }, [isConnected, questStates, credentialApprovals, minted]);
-
-  // ─── Quest Actions (student side) ──────────────────────────────────────
-  const handleQuestAction = useCallback(
-    (questId: string, action: string, data?: string) => {
-      setQuestStates((prev) => {
-        switch (action) {
-          case "open_link":
-            return updateQuestState(prev, questId, { linkOpened: true });
-          case "submit_self":
-            return updateQuestState(prev, questId, { status: "submitted" });
-          case "submit_link":
-            return updateQuestState(prev, questId, { status: "submitted", submittedData: data });
-          case "complete_quiz":
-            return updateQuestState(prev, questId, { status: "verified" });
-          default:
-            return prev;
-        }
-      });
-    },
-    []
-  );
-
-  // ─── Admin Actions ─────────────────────────────────────────────────────
-  const handleVerifyQuest = useCallback((questId: string) => {
-    setQuestStates((prev) => updateQuestState(prev, questId, { status: "verified" }));
-  }, []);
-
-  const handleRejectQuest = useCallback((questId: string) => {
-    setQuestStates((prev) => updateQuestState(prev, questId, { status: "rejected", submittedData: undefined }));
-  }, []);
-
-  const handleApproveCredential = useCallback((credId: string) => {
-    setCredentialApprovals((prev) => ({ ...prev, [credId]: true }));
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setQuestStates({});
-    setCredentialApprovals({});
-    setMinted({});
-  }, []);
+  }, [isConnected, questStates, credentialRecords]);
 
   return (
     <div className="min-h-screen bg-background px-4 py-7 text-foreground md:px-5">
@@ -92,7 +66,10 @@ export default function NextChainPortal() {
             {isConnected && walletIsAdmin && (
               <Btn
                 variant={showAdmin ? "danger" : "ghost"}
-                onClick={() => setShowAdmin((p) => !p)}
+                onClick={() => {
+                  setShowAdmin((p) => !p);
+                  if (!showAdmin) loadAllSubmissions();
+                }}
                 className="px-3.5 py-2 text-xs"
               >
                 {showAdmin ? "✕ Admin" : "⚙ Admin"}
@@ -103,13 +80,14 @@ export default function NextChainPortal() {
 
         <HeroSection />
         <FlowSection step={step} />
-        <StatsRow questStates={questStates} minted={minted} />
+        <StatsRow questStates={questStates} credentialRecords={credentialRecords} />
 
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1.15fr_0.85fr]">
           <QuestsSection
             questStates={questStates}
             onQuestAction={handleQuestAction}
             walletConnected={isConnected}
+            saveLearningProgress={saveLearningProgress}
           />
           <div className="flex flex-col gap-3.5">
             <ProfileCard walletConnected={isConnected} questStates={questStates} />
@@ -124,11 +102,14 @@ export default function NextChainPortal() {
                   <AdminPanel
                     questStates={questStates}
                     studentAddress={address || null}
-                    credentialApprovals={credentialApprovals}
-                    onVerifyQuest={handleVerifyQuest}
-                    onRejectQuest={handleRejectQuest}
-                    onApproveCredential={handleApproveCredential}
-                    onReset={handleReset}
+                    credentialRecords={credentialRecords}
+                    onVerifyQuest={adminVerifyQuest}
+                    onRejectQuest={adminRejectQuest}
+                    onApproveCredential={(credId) =>
+                      updateCredentialStatus(credId, { eligible: true })
+                    }
+                    allSubmissions={allSubmissions}
+                    onRefreshSubmissions={loadAllSubmissions}
                   />
                 </motion.div>
               )}
@@ -141,9 +122,9 @@ export default function NextChainPortal() {
           totalPts={pts}
           walletConnected={isConnected}
           walletAddress={address || null}
-          adminVerified={credentialApprovals}
-          minted={minted}
-          onMint={(id) => setMinted((p) => ({ ...p, [id]: true }))}
+          credentialRecords={credentialRecords}
+          isAdmin={walletIsAdmin}
+          onUpdateCredential={updateCredentialStatus}
         />
 
         {/* Footer */}
@@ -155,6 +136,12 @@ export default function NextChainPortal() {
           <Chip variant="dim">Nigeria → Africa</Chip>
         </div>
       </div>
+
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+          <div className="text-sm text-muted-foreground animate-pulse">Loading your progress…</div>
+        </div>
+      )}
     </div>
   );
 }

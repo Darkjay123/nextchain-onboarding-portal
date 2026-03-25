@@ -11,6 +11,7 @@ interface QuestsSectionProps {
   questStates: QuestStates;
   onQuestAction: (questId: string, action: string, data?: string) => void;
   walletConnected: boolean;
+  saveLearningProgress?: (moduleId: string, score: number, passed: boolean) => void;
 }
 
 const catChip: Record<string, "green" | "bright" | "dim"> = {
@@ -29,7 +30,7 @@ const statusLabel: Record<string, { text: string; variant: "green" | "bright" | 
   rejected: { text: "Rejected", variant: "dim" },
 };
 
-export function QuestsSection({ questStates, onQuestAction, walletConnected }: QuestsSectionProps) {
+export function QuestsSection({ questStates, onQuestAction, walletConnected, saveLearningProgress }: QuestsSectionProps) {
   const [showLearning, setShowLearning] = useState(false);
   const [linkInputs, setLinkInputs] = useState<Record<string, string>>({});
 
@@ -105,7 +106,6 @@ export function QuestsSection({ questStates, onQuestAction, walletConnected }: Q
                   </div>
                 </div>
 
-                {/* Action area */}
                 <div className="mt-3 flex items-center gap-2">
                   <QuestAction
                     quest={q}
@@ -136,8 +136,11 @@ export function QuestsSection({ questStates, onQuestAction, walletConnected }: Q
 
       {showLearning && (
         <LearningModule
-          onComplete={() => {
-            onQuestAction("web3_basics", "complete_quiz");
+          onComplete={(score, passed) => {
+            if (passed) {
+              onQuestAction("web3_basics", "complete_quiz");
+            }
+            saveLearningProgress?.("web3_basics", score, passed);
           }}
           onClose={() => setShowLearning(false)}
         />
@@ -177,7 +180,6 @@ function QuestAction({ quest, state, walletConnected, onAction, linkValue, onLin
     );
   }
 
-  // Social quests
   if (quest.verificationMethod === "self_link") {
     return (
       <div className="flex w-full gap-2">
@@ -203,7 +205,6 @@ function QuestAction({ quest, state, walletConnected, onAction, linkValue, onLin
     );
   }
 
-  // Event quests (admin only)
   if (quest.verificationMethod === "admin_only") {
     return (
       <div className="text-xs text-muted-foreground">
@@ -212,7 +213,6 @@ function QuestAction({ quest, state, walletConnected, onAction, linkValue, onLin
     );
   }
 
-  // Learning quest
   if (quest.verificationMethod === "quiz") {
     return (
       <Btn
@@ -224,7 +224,6 @@ function QuestAction({ quest, state, walletConnected, onAction, linkValue, onLin
     );
   }
 
-  // Content / TX submission
   if (quest.verificationMethod === "link_submission" || quest.verificationMethod === "tx_submission") {
     const placeholder =
       quest.verificationMethod === "tx_submission"

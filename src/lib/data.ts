@@ -139,6 +139,8 @@ export const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export const MAX_POINTS = QUESTS.reduce((s, q) => s + q.points, 0);
 
+export const CONTRACT_ADDRESS = "0xF34Dabf3107b916B085BFafF8FEe16938A44619e";
+
 // ─── Learning Module ─────────────────────────────────────────────────────
 export const LEARNING_SECTIONS = [
   {

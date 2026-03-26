@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { NCCard } from "./NCCard";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
@@ -6,7 +6,6 @@ import { Bar } from "./Bar";
 import { CREDENTIALS, QUESTS, shortAddr, type Credential } from "@/lib/data";
 import { CONTRACT_ADDRESS } from "@/lib/nextchainContract";
 import { type QuestStates, getQuestState } from "@/lib/questState";
-import { mintCredential } from "@/lib/mintCredential";
 import type { CredentialRecord } from "@/hooks/useWalletState";
 
 interface CredentialsSectionProps {
@@ -19,10 +18,7 @@ interface CredentialsSectionProps {
   onUpdateCredential: (credId: string, update: Partial<CredentialRecord>, targetWallet?: string) => void;
 }
 
-function getCredentialProgress(
-  cred: Credential,
-  questStates: QuestStates
-) {
+function getCredentialProgress(cred: Credential, questStates: QuestStates) {
   const questDetails = cred.requiredQuests.map((qId) => {
     const quest = QUESTS.find((q) => q.id === qId);
     const state = getQuestState(questStates, qId);
@@ -46,28 +42,23 @@ export function CredentialsSection({
   isAdmin,
   onUpdateCredential,
 }: CredentialsSectionProps) {
-  const [mintingId, setMintingId] = useState<string | null>(null);
-  const [mintResults, setMintResults] = useState<Record<string, { txHash?: string; error?: string }>>({});
-
-  const handleAdminMint = async (credId: string) => {
+  // Auto-persist eligibility to Supabase when quest completion changes
+  useEffect(() => {
     if (!walletAddress) return;
-    setMintingId(credId);
-    setMintResults((prev) => ({ ...prev, [credId]: {} }));
 
-    const result = await mintCredential(walletAddress);
+    for (const cred of CREDENTIALS) {
+      const progress = getCredentialProgress(cred, questStates);
+      const meetsPoints = cred.minPoints ? totalPts >= cred.minPoints : true;
+      const meetsAdmin = cred.requiresAdminApproval ? credentialRecords[cred.id]?.eligible : true;
+      const nowEligible = progress.allMet && meetsPoints && meetsAdmin;
+      const record = credentialRecords[cred.id];
 
-    if (result.success && result.txHash) {
-      setMintResults((prev) => ({ ...prev, [credId]: { txHash: result.txHash } }));
-      onUpdateCredential(credId, {
-        issued: true,
-        tx_hash: result.txHash,
-        issued_at: new Date().toISOString(),
-      });
-    } else {
-      setMintResults((prev) => ({ ...prev, [credId]: { error: result.error } }));
+      // If eligible and not yet marked, persist it
+      if (nowEligible && !record?.eligible && !record?.issued) {
+        onUpdateCredential(cred.id, { eligible: true });
+      }
     }
-    setMintingId(null);
-  };
+  }, [questStates, totalPts, walletAddress, credentialRecords, onUpdateCredential]);
 
   return (
     <NCCard>
@@ -87,8 +78,6 @@ export function CredentialsSection({
           const meetsAdmin = cred.requiresAdminApproval ? credRecord?.eligible : true;
           const unlocked = progress.allMet && meetsPoints && meetsAdmin;
           const issued = credRecord?.issued || false;
-          const isMinting = mintingId === cred.id;
-          const result = mintResults[cred.id];
 
           return (
             <div
@@ -188,7 +177,7 @@ export function CredentialsSection({
                 <Bar pct={(progress.completed / progress.total) * 100} />
               </div>
 
-              {/* Status / Mint area */}
+              {/* Status area — users see eligibility status, admin mints from admin panel */}
               {issued ? (
                 <div className="flex flex-col gap-2">
                   <Btn disabled variant="success" className="w-full justify-center text-xs">
@@ -212,18 +201,6 @@ export function CredentialsSection({
                     </div>
                   )}
                 </div>
-              ) : isMinting ? (
-                <Btn disabled variant="outline" className="w-full justify-center text-xs">
-                  <span className="animate-pulse">Minting…</span>
-                </Btn>
-              ) : isAdmin && unlocked ? (
-                <Btn
-                  onClick={() => handleAdminMint(cred.id)}
-                  variant="primary"
-                  className="w-full justify-center text-xs"
-                >
-                  ⬡ Mint Credential
-                </Btn>
               ) : unlocked && walletConnected ? (
                 <div className="rounded-lg border border-border bg-secondary p-3 text-center">
                   <div className="text-[12px] font-semibold text-primary">Eligible for Credential</div>
@@ -235,24 +212,6 @@ export function CredentialsSection({
                 <div className="text-center text-[11px] text-muted-foreground">
                   Complete all requirements to unlock
                 </div>
-              )}
-
-              {/* Result feedback */}
-              {result?.txHash && !issued && (
-                <div className="text-center text-[10.5px] text-primary break-all">
-                  ✓ TX:{" "}
-                  <a
-                    href={`https://basescan.org/tx/${result.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    {result.txHash.slice(0, 10)}…{result.txHash.slice(-6)}
-                  </a>
-                </div>
-              )}
-              {result?.error && (
-                <div className="text-center text-[10.5px] text-destructive">{result.error}</div>
               )}
             </div>
           );

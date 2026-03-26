@@ -108,6 +108,7 @@ export default function NextChainPortal() {
                     onApproveCredential={(credId) =>
                       updateCredentialStatus(credId, { eligible: true })
                     }
+                    onUpdateCredential={updateCredentialStatus}
                     allSubmissions={allSubmissions}
                     onRefreshSubmissions={loadAllSubmissions}
                   />

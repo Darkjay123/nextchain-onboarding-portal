@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NCCard } from "./NCCard";
 import { Chip } from "./Chip";
 import { Btn } from "./Btn";
 import { QUESTS, CREDENTIALS, shortAddr } from "@/lib/data";
 import { type QuestStates, getQuestState } from "@/lib/questState";
+import { mintCredential } from "@/lib/mintCredential";
 import type { CredentialRecord } from "@/hooks/useWalletState";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminPanelProps {
   questStates: QuestStates;
@@ -13,6 +15,7 @@ interface AdminPanelProps {
   onVerifyQuest: (questId: string, targetWallet?: string) => void;
   onRejectQuest: (questId: string, targetWallet?: string) => void;
   onApproveCredential: (credId: string) => void;
+  onUpdateCredential: (credId: string, update: Partial<CredentialRecord>, targetWallet?: string) => void;
   allSubmissions: Array<{
     wallet_address: string;
     quest_id: string;
@@ -22,6 +25,13 @@ interface AdminPanelProps {
   onRefreshSubmissions: () => void;
 }
 
+interface PendingIssuance {
+  wallet_address: string;
+  credential_id: string;
+  eligible: boolean;
+  issued: boolean;
+}
+
 export function AdminPanel({
   questStates,
   studentAddress,
@@ -29,12 +39,67 @@ export function AdminPanel({
   onVerifyQuest,
   onRejectQuest,
   onApproveCredential,
+  onUpdateCredential,
   allSubmissions,
   onRefreshSubmissions,
 }: AdminPanelProps) {
+  const [pendingIssuances, setPendingIssuances] = useState<PendingIssuance[]>([]);
+  const [mintingKey, setMintingKey] = useState<string | null>(null);
+  const [mintResults, setMintResults] = useState<Record<string, { txHash?: string; error?: string }>>({});
+
+  const loadPendingIssuances = async () => {
+    const { data } = await supabase
+      .from("credential_status")
+      .select("wallet_address, credential_id, eligible, issued")
+      .eq("eligible", true)
+      .eq("issued", false);
+    if (data) setPendingIssuances(data);
+  };
+
   useEffect(() => {
     onRefreshSubmissions();
+    loadPendingIssuances();
   }, []);
+
+  const handleMintToUser = async (recipientWallet: string, credId: string) => {
+    const key = `${recipientWallet}-${credId}`;
+    setMintingKey(key);
+    setMintResults((prev) => ({ ...prev, [key]: {} }));
+
+    // Pre-check: already issued?
+    const { data: existing } = await supabase
+      .from("credential_status")
+      .select("issued")
+      .eq("wallet_address", recipientWallet.toLowerCase())
+      .eq("credential_id", credId)
+      .maybeSingle();
+
+    if (existing?.issued) {
+      setMintResults((prev) => ({
+        ...prev,
+        [key]: { error: "This wallet has already received a credential with the current contract." },
+      }));
+      setMintingKey(null);
+      return;
+    }
+
+    // Mint TO the recipient wallet, not admin
+    const result = await mintCredential(recipientWallet);
+
+    if (result.success && result.txHash) {
+      setMintResults((prev) => ({ ...prev, [key]: { txHash: result.txHash } }));
+      onUpdateCredential(credId, {
+        issued: true,
+        tx_hash: result.txHash,
+        issued_at: new Date().toISOString(),
+      }, recipientWallet);
+      // Refresh list
+      loadPendingIssuances();
+    } else {
+      setMintResults((prev) => ({ ...prev, [key]: { error: result.error } }));
+    }
+    setMintingKey(null);
+  };
 
   const verifiedQuests = QUESTS.filter((q) => getQuestState(questStates, q.id).status === "verified");
   const totalPts = verifiedQuests.reduce((s, q) => s + q.points, 0);
@@ -52,10 +117,10 @@ export function AdminPanel({
             <Chip variant="dim">Internal</Chip>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Review submissions · verify quests · approve credentials
+            Review submissions · verify quests · approve credentials · mint to users
           </div>
         </div>
-        <Btn onClick={onRefreshSubmissions} variant="ghost" className="px-4">
+        <Btn onClick={() => { onRefreshSubmissions(); loadPendingIssuances(); }} variant="ghost" className="px-4">
           ↻
         </Btn>
       </div>
@@ -84,6 +149,67 @@ export function AdminPanel({
           </>
         )}
       </div>
+
+      {/* ═══ PENDING CREDENTIAL ISSUANCE ═══ */}
+      {pendingIssuances.length > 0 && (
+        <div className="mb-3.5">
+          <div className="mb-2 text-[11px] uppercase tracking-widest text-muted-foreground/60">
+            Pending Credential Issuance ({pendingIssuances.length})
+          </div>
+          {pendingIssuances.map((item) => {
+            const cred = CREDENTIALS.find((c) => c.id === item.credential_id);
+            const key = `${item.wallet_address}-${item.credential_id}`;
+            const isMinting = mintingKey === key;
+            const result = mintResults[key];
+
+            return (
+              <div key={key} className="mb-2 rounded-xl border border-border bg-background p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="text-lg">{cred?.emoji || "🏅"}</span>
+                  <span className="text-[13px] font-semibold text-foreground">
+                    {cred?.title || item.credential_id}
+                  </span>
+                </div>
+                <div className="mb-1 text-[10px] font-mono text-muted-foreground/50">
+                  Recipient: {shortAddr(item.wallet_address)}
+                </div>
+                <div className="mb-1 text-[10px] text-primary/60">
+                  Eligible ✓ · Not yet issued
+                </div>
+
+                {isMinting ? (
+                  <Btn disabled variant="outline" className="rounded-lg px-3 py-1 text-xs">
+                    <span className="animate-pulse">Minting…</span>
+                  </Btn>
+                ) : result?.txHash ? (
+                  <div className="text-[10.5px] text-primary break-all">
+                    ✓ Minted —{" "}
+                    <a
+                      href={`https://basescan.org/tx/${result.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      View TX ↗
+                    </a>
+                  </div>
+                ) : (
+                  <Btn
+                    onClick={() => handleMintToUser(item.wallet_address, item.credential_id)}
+                    className="rounded-lg px-3 py-1 text-xs"
+                  >
+                    ⬡ Mint to {shortAddr(item.wallet_address)}
+                  </Btn>
+                )}
+
+                {result?.error && (
+                  <div className="mt-1 text-[10.5px] text-destructive">{result.error}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* All pending submissions from all wallets */}
       {allSubmissions.length > 0 && (
@@ -168,7 +294,7 @@ export function AdminPanel({
         </div>
       )}
 
-      {allSubmissions.length === 0 && pendingCredentials.length === 0 && (
+      {allSubmissions.length === 0 && pendingIssuances.length === 0 && pendingCredentials.length === 0 && (
         <div className="text-center text-[13px] text-muted-foreground/40 py-2">
           No pending items to review.
         </div>

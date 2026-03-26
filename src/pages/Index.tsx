@@ -11,7 +11,7 @@ import { QuestsSection } from "@/components/nc/QuestsSection";
 import { ProfileCard } from "@/components/nc/ProfileCard";
 import { AdminPanel } from "@/components/nc/AdminPanel";
 import { CredentialsSection } from "@/components/nc/CredentialsSection";
-import { QUESTS, isAdmin } from "@/lib/data";
+import { QUESTS, isAdmin, ADMIN_WALLET } from "@/lib/data";
 import { getQuestState } from "@/lib/questState";
 import { useWalletState } from "@/hooks/useWalletState";
 
@@ -136,6 +136,15 @@ export default function NextChainPortal() {
           <Chip variant="dim">Nigeria → Africa</Chip>
         </div>
       </div>
+
+      {/* Debug: Admin wallet check */}
+      {isConnected && (
+        <div className="fixed bottom-3 left-3 z-50 rounded-lg border border-border bg-card p-3 text-[10px] font-mono text-muted-foreground shadow-lg">
+          <div>Connected: {address}</div>
+          <div>Admin: {ADMIN_WALLET}</div>
+          <div>isAdmin: <span className={walletIsAdmin ? "text-primary font-bold" : "text-destructive font-bold"}>{String(walletIsAdmin)}</span></div>
+        </div>
+      )}
 
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">

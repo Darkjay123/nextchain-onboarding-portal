@@ -219,15 +219,39 @@ export function useWalletState(walletAddress: string | undefined) {
         [credId]: { ...prev[credId], credential_id: credId, ...update } as CredentialRecord,
       }));
 
-      await supabase.from("credential_status").upsert(
-        {
-          wallet_address: wallet,
-          credential_id: credId,
-          ...update,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "wallet_address,credential_id" }
-      );
+      // Check if record exists first
+      const { data: existing, error: selectError } = await supabase
+        .from("credential_status")
+        .select("id")
+        .eq("wallet_address", wallet)
+        .eq("credential_id", credId)
+        .maybeSingle();
+
+      if (selectError) {
+        console.error("Error checking credential_status:", selectError);
+        return;
+      }
+
+      if (existing) {
+        await supabase
+          .from("credential_status")
+          .update({
+            ...update,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("credential_status")
+          .insert({
+            wallet_address: wallet,
+            credential_id: credId,
+            eligible: false,
+            issued: false,
+            ...update,
+            updated_at: new Date().toISOString(),
+          });
+      }
     },
     [addr]
   );

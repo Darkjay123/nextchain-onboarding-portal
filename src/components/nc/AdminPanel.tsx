@@ -67,20 +67,30 @@ export function AdminPanel({
     setMintResults((prev) => ({ ...prev, [key]: {} }));
 
     // Pre-check: already issued?
-    const { data: existing } = await supabase
-      .from("credential_status")
-      .select("issued")
-      .eq("wallet_address", recipientWallet.toLowerCase())
-      .eq("credential_id", credId)
-      .maybeSingle();
+    try {
+      const { data: existing, error: checkError } = await supabase
+        .from("credential_status")
+        .select("issued")
+        .eq("wallet_address", recipientWallet.toLowerCase())
+        .eq("credential_id", credId)
+        .maybeSingle();
 
-    if (existing?.issued) {
-      setMintResults((prev) => ({
-        ...prev,
-        [key]: { error: "This wallet has already received a credential with the current contract." },
-      }));
-      setMintingKey(null);
-      return;
+      if (checkError) {
+        console.warn("credential_status pre-check warning:", checkError);
+        // Don't block mint — proceed anyway
+      }
+
+      if (existing?.issued) {
+        setMintResults((prev) => ({
+          ...prev,
+          [key]: { error: "This wallet has already received a credential with the current contract." },
+        }));
+        setMintingKey(null);
+        return;
+      }
+    } catch (err) {
+      console.warn("credential_status pre-check exception:", err);
+      // Don't block mint — proceed anyway
     }
 
     // Mint TO the recipient wallet, not admin
